@@ -3,6 +3,7 @@
 Havoc is a modern and malleable post-exploitation command and control framework.
 
 #### Table of Contents
+- [Version History](#vhistory)
 - [Known Issues](#kissues)
 - [Installation](#install)
 	- [Building the Client](#bclient)
@@ -32,18 +33,29 @@ Havoc is a modern and malleable post-exploitation command and control framework.
 - [TODO](#todo)
 --------------------
 
+## <a name="vhistory"></a> Version History
+
+### 0.1 / Star Platinum
+
+> Named after the Strand of [Jotaro Kujo](https://jojo.fandom.com/wiki/Star_Platinum) in JoJo's Bizzare Adventure, Star Platinum was among the very first Strands introduced.
+
+- The first, public release of Havoc.
+
+---
 
 ## <a name="kissues"></a>Known Issues
 
 > See the Issues tab for all open issues. 
 
-**Kali Linux Font/Formatting Issues**
+### Kali Linux Font/Formatting Issues
 
 Kali has issues loading the proper font (Monaco) from the embedeed Qt resources file.
 
 _You will experience formatting issues in the Havoc client if you are not using a monospace/fixed-width font!_
 
-**Build Error: `fatal error: Python.h: No such file or directory`**
+### Build Errors 
+
+#### `fatal error: Python.h: No such file or directory`
 
 If you get an error that `Python.h` isn't found when building, you need to make sure Python 3.10 is installed and you have the Python 3.10 development files. If you are using Ubuntu LTS you may need to leverage a PPA such as `deadsnakes` to get a newer version of Python.
 
@@ -54,7 +66,7 @@ sudo apt update
 sudo apt install python3.10 python3.10-dev
 ```
 
-**Build Error: `incomplete type ‘QTime’ used in nested name specifier`**
+#### `incomplete type ‘QTime’ used in nested name specifier`
 
 You probably need a newer version of Qt. If you are using Ubuntu try adding a backports ppa and installing the latest qt6 dev packages.
 
@@ -318,8 +330,6 @@ Full documentation on commands can be accessed from the Havoc client by typing `
 
 ##### `checkin`
 
-> Results from this command are not yet fully implemented.
-
 Requests a checkin request from the Demon. This will output some basic system/configuration information to the Havoc client such as:
 
 - Demon Metadata
@@ -390,6 +400,41 @@ Demon implements a token management vault that allows for token theft, impersona
 - `token revert` - Reverts back to the default process token
 - `token remove [id]` - Removes a token from the vault
 - `token clear` - Removes all tokens from the vault.
+
+##### `shellcode`
+
+Demon is capable of injecting shellcode (supplied in raw format as a path) into remote processes using process injection or fork & run. Depending on the technique, operators can chose to use higher-level Win32 APIs or NT versions using indirect syscalls.
+
+- `shellcode inject x64 [pid] [path-to-raw-shellcode]` - Injects shellcode into the remote process
+- `shellcode spawn x64 [path-to-raw-shellcode]` - Launches the defined fork & run process and injects the shellcode
+
+> OPSEC NOTE: Depending on your injection technique and configuration settings, certain API calls may be performed outside of indirect syscalls. 
+
+Here is a high-level overview of each supported process injection technique:
+
+> `*` means the API call is performed with indirect syscalls
+
+**`INJECTION_TECHNIQUE_SYSCALL`**
+1. `CreateProcessA`
+2. Allocate Memory
+    - `DX_MEM_WIN32 -> VirtualAllocEx`
+    - `DX_MEM_SYSCALL -> NtAllocateVirtualMemory*`
+3. `NtWriteVirtualMemory*`
+4. `NtProtectVirtualMemory*`
+5. Create Thread 
+    - `DX_THREAD_WIN32 -> CreateRemoteThread`
+    - `DX_THREAD_SYSCALL -> NtCreateThreadEx*`
+6. `NtResumeThread*`
+
+##### `dotnet`
+
+- `dotnet list-versions` - Lists all of the installed dotnet versions
+- `dotnet inline-execute [path-to-assembly] [args]` - Executes the dotnet assembly inside of the current process and returns output
+
+> OPSEC NOTE: Calling `inline-execute` creates an instance of the CLR (Common Language Runtime) within the demon's process to execute dotnet assemblies. This is an irreversible procedure and may provide more IoCs to defenders.
+
+The `inline-execute` works by first creating an instance of the CLR (Common Language Runtime) within the current Demon process. After the CLR is created, `amsi.dll` is loaded and patched in-memory to bypass AMSI scanning. Demon then creates an AppDomain and loads the assembly into memory, finding the entry point and passing the commandline args supplied by the user before invoking the method. Output from the assembly is captured and returned to the teamserver.
+
 
 (INCOMPLETE)
 
